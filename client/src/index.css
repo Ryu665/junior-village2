@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  /* 평면적인 단색 대신 은은한 방사형 그라데이션으로 배경에 깊이감을 준다 */
+  background:
+    radial-gradient(circle at 14% 0%, rgba(63, 143, 214, 0.08), transparent 32%),
+    radial-gradient(circle at 100% 12%, rgba(47, 174, 85, 0.08), transparent 34%),
+    #eef1f6;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 모바일 우선: 데스크톱에서도 앱처럼 중앙 정렬된 폭으로 보이게 함 */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #fdfefd;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 4px rgba(15, 30, 20, 0.04), 0 24px 60px rgba(15, 30, 20, 0.1);
+}
+
+@media (min-width: 481px) {
+  .app-shell {
+    margin: 16px auto;
+    min-height: calc(100vh - 32px);
+    border-radius: 28px;
+    overflow: hidden;
+  }
+}
+
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@layer components {
+  .btn-big {
+    @apply tap-target rounded-2xl font-extrabold text-lg px-6 py-4 shadow-raised active:scale-95 active:shadow-none transition-all;
+  }
+}

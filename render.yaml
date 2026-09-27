@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: junior-village
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --include=dev && npx prisma generate --schema server/prisma/schema.prisma && npm run build --workspace client
+    startCommand: node server/scripts/start-prod.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:./prod.db
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES
+        value: 30d
+      # 나이스(NEIS) Open API 인증키 - 저장소에 넣지 않고 Render 대시보드에서 직접 입력한다.
+      - key: NEIS_API_KEY
+        sync: false

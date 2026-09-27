@@ -1,0 +1,23 @@
+{
+  "name": "junior-village-v2",
+  "private": true,
+  "version": "0.1.0",
+  "description": "주니어빌리지(Junior Village) - 어린이 금융교육/미션/용돈 플랫폼 프로토타입",
+  "scripts": {
+    "dev": "concurrently -n SERVER,CLIENT -c blue,green \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "install:all": "npm install",
+    "prisma:generate": "npm run prisma:generate --workspace server",
+    "prisma:migrate": "npm run prisma:migrate --workspace server",
+    "seed": "npm run seed --workspace server",
+    "quiz:generate": "node scripts/generate-quiz-bank.js"
+  },
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

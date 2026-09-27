@@ -1,0 +1,203 @@
+// 주니어빌리지(Junior Village) - Prisma schema
+// 프로토타입 단계: SQLite 파일 기반 DB 사용
+// TODO(실서비스 전환 시): 실명확인, 법정대리인 동의, 전자금융거래법 등 준수 필요
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite 커넥터는 네이티브 enum을 지원하지 않아 String으로 표현한다.
+// 애플리케이션 레이어(routes/services)에서 아래 허용값만 사용하도록 검증한다.
+//   Role: "PARENT" | "CHILD"
+//   RepeatType: "ONCE" | "DAILY" | "WEEKLY"
+//   MissionStatus: "ACTIVE" | "COMPLETED" | "CANCELLED"
+//   SubmissionStatus: "PENDING" | "APPROVED" | "REJECTED"
+//   TransactionType: "MISSION_REWARD" | "DEPOSIT" | "WITHDRAW" | "MANUAL" | "TREASURE_REWARD" | "QUIZ_REWARD"
+
+model User {
+  id          String   @id @default(cuid())
+  role        String
+  name        String
+  avatarEmoji String   @default("🙂")
+  // 실제 서비스에서는 별도 인증 서버/실명확인 연동 필요. 프로토타입은 PIN 해시만 저장.
+  pinHash     String
+  createdAt   DateTime @default(now())
+
+  // 자녀 소속 학교 (게임 랭킹용)
+  school   School? @relation(fields: [schoolId], references: [id])
+  schoolId String?
+
+  // 부모<->자녀 연동
+  childLinks  ParentChildLink[] @relation("ParentLinks")
+  parentLinks ParentChildLink[] @relation("ChildLinks")
+
+  account           Account?
+  createdMissions   Mission[]           @relation("MissionCreator")
+  submissions       MissionSubmission[]
+  savingsGoals      SavingsGoal[]
+  gameSessions      GameSession[]
+  notifications     Notification[]
+  learningState     LearningState?
+  dailyQuizzes      DailyQuiz[]
+  reviewedMissions  MissionSubmission[] @relation("MissionReviewer")
+}
+
+model ParentChildLink {
+  id        String   @id @default(cuid())
+  parent    User     @relation("ParentLinks", fields: [parentId], references: [id])
+  parentId  String
+  child     User     @relation("ChildLinks", fields: [childId], references: [id])
+  childId   String
+  createdAt DateTime @default(now())
+
+  @@unique([parentId, childId])
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  // 모의(mock) 잔액. 원(KRW) 단위 정수. 실제 코어뱅킹과 연동되지 않음.
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id         String          @id @default(cuid())
+  fromUserId String?
+  toUserId   String?
+  amount     Int
+  type       String
+  memo       String?
+  missionId  String?
+  createdAt  DateTime        @default(now())
+}
+
+model Mission {
+  id           String              @id @default(cuid())
+  parent       User                @relation("MissionCreator", fields: [parentId], references: [id])
+  parentId     String
+  childId      String
+  title        String
+  description  String?
+  rewardAmount Int
+  dueDate      DateTime?
+  repeat       String              @default("ONCE")
+  status       String              @default("ACTIVE")
+  submissions  MissionSubmission[]
+  createdAt    DateTime            @default(now())
+}
+
+model MissionSubmission {
+  id           String           @id @default(cuid())
+  mission      Mission          @relation(fields: [missionId], references: [id])
+  missionId    String
+  child        User             @relation(fields: [childId], references: [id])
+  childId      String
+  proofNote    String?
+  status       String           @default("PENDING")
+  submittedAt  DateTime         @default(now())
+  reviewedAt   DateTime?
+  reviewer     User?            @relation("MissionReviewer", fields: [reviewerId], references: [id])
+  reviewerId   String?
+}
+
+model SavingsGoal {
+  id            String   @id @default(cuid())
+  child         User     @relation(fields: [childId], references: [id])
+  childId       String
+  title         String
+  emoji         String   @default("🎯")
+  targetAmount  Int
+  currentAmount Int      @default(0)
+  // 저축을 시작하기로 한 날 / 목표 완료 희망일 (둘 다 KST "YYYY-MM-DD", targetDate는 선택)
+  startDate     String?
+  targetDate    String?
+  createdAt     DateTime @default(now())
+}
+
+model School {
+  id       String @id @default(cuid())
+  name     String
+  address  String?
+  // 나이스(NEIS) 교육정보 개방포털 학교 코드. 실제 존재하는 학교를 검색해서 등록하며,
+  // 이 두 코드 조합으로 급식 정보 API를 조회한다. (같은 이름의 학교가 지역마다 있을 수 있어
+  // name 단독이 아니라 이 코드 조합을 유니크 키로 사용한다.)
+  neisAtptCode   String?
+  neisSchoolCode String?
+  users          User[]
+  gameSessions   GameSession[]
+
+  @@unique([neisAtptCode, neisSchoolCode])
+}
+
+model GameSession {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  school     School?  @relation(fields: [schoolId], references: [id])
+  schoolId   String?
+  score      Int
+  // "심부름 지폐 계산" 챌린지 난이도(레벨): 1(돈과 친해지기) / 2(생활 계산) / 3(장보기 마스터)
+  difficulty Int      @default(1)
+  playedAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  relatedId String? // 주로 MissionSubmission.id
+  missionId String? // MISSION_SUBMITTED 알림에서 바로 승인/반려할 수 있도록 함께 저장
+  childId   String? // 어떤 자녀에 대한 알림인지 (부모 알림함에서 바로 이동/표시용)
+  createdAt DateTime @default(now())
+}
+
+model EducationCard {
+  id    String @id @default(cuid())
+  title String
+  body  String
+  emoji String @default("💡")
+  order Int    @default(0)
+}
+
+// 사용자별 연속학습/레벨/포인트 현재 상태 (서버가 유일한 계산 주체)
+model LearningState {
+  id                  String   @id @default(cuid())
+  user                User     @relation(fields: [userId], references: [id])
+  userId              String   @unique
+  currentStreak       Int      @default(0)
+  lastCompletedDate   String? // KST "YYYY-MM-DD"
+  currentLevel        Int      @default(0)
+  totalPoints         Int      @default(0)
+  lastTreasureDate    String? // 마지막 보물상자 지급 날짜
+  nextTreasureGapDays Int? // 다음 보물상자까지 필요한 랜덤 간격(일)
+  updatedAt           DateTime @updatedAt
+}
+
+// 사용자별 날짜별 "오늘의 퀴즈 3문제" 기록 (원본 데이터, idempotent 처리의 기준)
+model DailyQuiz {
+  id                  String   @id @default(cuid())
+  user                User     @relation(fields: [userId], references: [id])
+  userId              String
+  date                String // KST "YYYY-MM-DD"
+  questionIds         String // JSON.stringify(string[3])
+  answersJson         String // JSON.stringify({[questionId]: {answered, correct, selected}})
+  totalCorrect        Int      @default(0)
+  completed           Boolean  @default(false)
+  attendance          Boolean  @default(false)
+  rewardPoint         Int      @default(0)
+  treasureRewardGiven Boolean  @default(false)
+  treasurePoint       Int?
+  createdAt           DateTime @default(now())
+
+  @@unique([userId, date])
+}
